@@ -24,3 +24,37 @@ func createRandomAccount(t *testing.T) (Account, CreateAccountParams) {
 
 	return acc, arg
 }
+
+func deleteEntry(t *testing.T, entry_id int64) {
+	t.Helper()
+
+	tag, err := testQueries.db.Exec(
+		context.Background(),
+		"DELETE FROM entries WHERE id = $1",
+		entry_id,
+	)
+
+	if err != nil {
+		t.Fatal("Cannot delete entry:", err)
+	}
+	if tag.RowsAffected() != 1 {
+		t.Fatalf("expected to delete 1 row, deleted %d", tag.RowsAffected())
+	}
+}
+
+func deleteTransfer(t *testing.T, transfer_id int64) {
+	t.Helper()
+
+	tag, err := testQueries.db.Exec(
+		context.Background(),
+		"DELETE FROM transfers WHERE id = $1",
+		transfer_id,
+	)
+
+	if err != nil {
+		t.Fatal("Cannot delete transfer:", err)
+	}
+	if tag.RowsAffected() != 1 {
+		t.Fatalf("expected to delete 1 row, deleted %d", tag.RowsAffected())
+	}
+}
