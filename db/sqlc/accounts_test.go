@@ -148,3 +148,59 @@ func TestGetAccountForUpdate(t *testing.T) {
 	require.Equal(t, acc1.Balance, acc2.Balance)
 	require.Equal(t, acc1.Currency, acc2.Currency)
 }
+
+func TestCreateAccountNegativeBalanceConstraint(t *testing.T) {
+	ctx := context.Background()
+
+	arg := CreateAccountParams{
+		Owner:    gofakeit.Name(),
+		Balance:  -100,
+		Currency: gofakeit.CurrencyShort(),
+	}
+
+	_, err := testQueries.CreateAccount(ctx, arg)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "balance_non_negative")
+}
+
+func TestUpdateAccountNegativeBalanceConstraint(t *testing.T) {
+	ctx := context.Background()
+	acc, _ := createRandomAccount(t)
+
+	t.Cleanup(func() {
+		_ = testQueries.DeleteAccount(ctx, acc.ID)
+	})
+
+	arg := UpdateAccountParams{
+		ID:      acc.ID,
+		Balance: -100,
+	}
+
+	_, err := testQueries.UpdateAccount(ctx, arg)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "balance_non_negative")
+}
+
+func TestChangeAccountBalanceNegativeConstraint(t *testing.T) {
+	ctx := context.Background()
+
+	arg := CreateAccountParams{
+		Owner:    gofakeit.Name(),
+		Balance:  100,
+		Currency: "USD",
+	}
+	acc, err := testQueries.CreateAccount(ctx, arg)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		_ = testQueries.DeleteAccount(ctx, acc.ID)
+	})
+
+	// attempt to decrease balance by more than current balance
+	_, err = testQueries.ChangeAccountBalance(ctx, ChangeAccountBalanceParams{
+		ID:     acc.ID,
+		Amount: -200,
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "balance_non_negative")
+}
