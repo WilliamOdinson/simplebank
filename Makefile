@@ -26,4 +26,7 @@ coverage:
 	go tool cover -html=coverage.out -o coverage.html
 	rm -f coverage.out
 
+server:
+	go run main.go
+
 .PHONY: createdb dropdb postgres migrateup migratedown sqlc test coverage
