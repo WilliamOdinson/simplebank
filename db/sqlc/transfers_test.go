@@ -114,3 +114,64 @@ func TestListTransfers(t *testing.T) {
 		require.True(t, tr.FromAccountID == acc1.ID || tr.ToAccountID == acc1.ID)
 	}
 }
+
+func TestCreateTransferZeroAmountConstraint(t *testing.T) {
+	ctx := context.Background()
+	fromAcc, _ := createRandomAccount(t)
+	toAcc, _ := createRandomAccount(t)
+
+	t.Cleanup(func() {
+		_ = testQueries.DeleteAccount(ctx, toAcc.ID)
+		_ = testQueries.DeleteAccount(ctx, fromAcc.ID)
+	})
+
+	arg := CreateTransferParams{
+		FromAccountID: fromAcc.ID,
+		ToAccountID:   toAcc.ID,
+		Amount:        0,
+	}
+
+	_, err := testQueries.CreateTransfer(ctx, arg)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "amount_positive")
+}
+
+func TestCreateTransferNegativeAmountConstraint(t *testing.T) {
+	ctx := context.Background()
+	fromAcc, _ := createRandomAccount(t)
+	toAcc, _ := createRandomAccount(t)
+
+	t.Cleanup(func() {
+		_ = testQueries.DeleteAccount(ctx, toAcc.ID)
+		_ = testQueries.DeleteAccount(ctx, fromAcc.ID)
+	})
+
+	arg := CreateTransferParams{
+		FromAccountID: fromAcc.ID,
+		ToAccountID:   toAcc.ID,
+		Amount:        -100,
+	}
+
+	_, err := testQueries.CreateTransfer(ctx, arg)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "amount_positive")
+}
+
+func TestCreateTransferSameAccountConstraint(t *testing.T) {
+	ctx := context.Background()
+	acc, _ := createRandomAccount(t)
+
+	t.Cleanup(func() {
+		_ = testQueries.DeleteAccount(ctx, acc.ID)
+	})
+
+	arg := CreateTransferParams{
+		FromAccountID: acc.ID,
+		ToAccountID:   acc.ID,
+		Amount:        100,
+	}
+
+	_, err := testQueries.CreateTransfer(ctx, arg)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "different_accounts")
+}

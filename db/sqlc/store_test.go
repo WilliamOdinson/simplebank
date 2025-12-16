@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v7"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/require"
 )
 
@@ -13,8 +14,22 @@ func TestTransferTx(t *testing.T) {
 	ctx := context.Background()
 	store := NewStore(testPool)
 
-	account1, _ := createRandomAccount(t)
-	account2, _ := createRandomAccount(t)
+	// create accounts with sufficient balance for transfers
+	acc1Arg := CreateAccountParams{
+		Owner:    gofakeit.Name(),
+		Balance:  10000,
+		Currency: gofakeit.CurrencyShort(),
+	}
+	account1, err := testQueries.CreateAccount(ctx, acc1Arg)
+	require.NoError(t, err)
+
+	acc2Arg := CreateAccountParams{
+		Owner:    gofakeit.Name(),
+		Balance:  10000,
+		Currency: gofakeit.CurrencyShort(),
+	}
+	account2, err := testQueries.CreateAccount(ctx, acc2Arg)
+	require.NoError(t, err)
 
 	log.Printf("Before Transfer: \nAccount1 Balance: %d\nAccount2 Balance: %d\n", account1.Balance, account2.Balance)
 
@@ -148,12 +163,137 @@ func TestTransferTx(t *testing.T) {
 	})
 }
 
+func TestTransferTxSameAccountConstraint(t *testing.T) {
+	ctx := context.Background()
+	store := NewStore(testPool)
+
+	acc, _ := createRandomAccount(t)
+
+	t.Cleanup(func() {
+		_ = testQueries.DeleteAccount(ctx, acc.ID)
+	})
+
+	// transfer to the same account should fail
+	_, err := store.TransferTx(ctx, TransferTxParams{
+		FromAccountID: acc.ID,
+		ToAccountID:   acc.ID,
+		Amount:        100,
+	})
+	require.Error(t, err)
+
+	var pgErr *pgconn.PgError
+	require.ErrorAs(t, err, &pgErr)
+	require.Equal(t, "23514", pgErr.Code) // check_violation
+}
+
+func TestTransferTxNegativeAmountConstraint(t *testing.T) {
+	ctx := context.Background()
+	store := NewStore(testPool)
+
+	acc1, _ := createRandomAccount(t)
+	acc2, _ := createRandomAccount(t)
+
+	t.Cleanup(func() {
+		_ = testQueries.DeleteAccount(ctx, acc2.ID)
+		_ = testQueries.DeleteAccount(ctx, acc1.ID)
+	})
+
+	// negative amount should fail
+	_, err := store.TransferTx(ctx, TransferTxParams{
+		FromAccountID: acc1.ID,
+		ToAccountID:   acc2.ID,
+		Amount:        -100,
+	})
+	require.Error(t, err)
+
+	var pgErr *pgconn.PgError
+	require.ErrorAs(t, err, &pgErr)
+	require.Equal(t, "23514", pgErr.Code) // check_violation
+}
+
+func TestTransferTxZeroAmountConstraint(t *testing.T) {
+	ctx := context.Background()
+	store := NewStore(testPool)
+
+	acc1, _ := createRandomAccount(t)
+	acc2, _ := createRandomAccount(t)
+
+	t.Cleanup(func() {
+		_ = testQueries.DeleteAccount(ctx, acc2.ID)
+		_ = testQueries.DeleteAccount(ctx, acc1.ID)
+	})
+
+	// zero amount should fail
+	_, err := store.TransferTx(ctx, TransferTxParams{
+		FromAccountID: acc1.ID,
+		ToAccountID:   acc2.ID,
+		Amount:        0,
+	})
+	require.Error(t, err)
+
+	var pgErr *pgconn.PgError
+	require.ErrorAs(t, err, &pgErr)
+	require.Equal(t, "23514", pgErr.Code) // check_violation
+}
+
+func TestTransferTxInsufficientBalanceConstraint(t *testing.T) {
+	ctx := context.Background()
+	store := NewStore(testPool)
+
+	// create account with small balance
+	acc1Arg := CreateAccountParams{
+		Owner:    gofakeit.Name(),
+		Balance:  100,
+		Currency: gofakeit.CurrencyShort(),
+	}
+	acc1, err := testQueries.CreateAccount(ctx, acc1Arg)
+	require.NoError(t, err)
+
+	acc2, _ := createRandomAccount(t)
+
+	t.Cleanup(func() {
+		_ = testQueries.DeleteAccount(ctx, acc2.ID)
+		_ = testQueries.DeleteAccount(ctx, acc1.ID)
+	})
+
+	// transfer more than balance should fail due to balance_non_negative constraint
+	_, err = store.TransferTx(ctx, TransferTxParams{
+		FromAccountID: acc1.ID,
+		ToAccountID:   acc2.ID,
+		Amount:        200, // more than acc1's balance
+	})
+	require.Error(t, err)
+
+	var pgErr *pgconn.PgError
+	require.ErrorAs(t, err, &pgErr)
+	require.Equal(t, "23514", pgErr.Code) // check_violation
+
+	// verify acc1 balance is unchanged (transaction should have rolled back)
+	acc1After, err := store.GetAccount(ctx, acc1.ID)
+	require.NoError(t, err)
+	require.Equal(t, acc1.Balance, acc1After.Balance)
+}
+
 func TestBilateralTransferTxDeadlock(t *testing.T) {
 	ctx := context.Background()
 	store := NewStore(testPool)
 
-	account1, _ := createRandomAccount(t)
-	account2, _ := createRandomAccount(t)
+	// create accounts with sufficient balance
+	acc1Arg := CreateAccountParams{
+		Owner:    gofakeit.Name(),
+		Balance:  10000,
+		Currency: gofakeit.CurrencyShort(),
+	}
+	account1, err := testQueries.CreateAccount(ctx, acc1Arg)
+	require.NoError(t, err)
+
+	acc2Arg := CreateAccountParams{
+		Owner:    gofakeit.Name(),
+		Balance:  10000,
+		Currency: gofakeit.CurrencyShort(),
+	}
+	account2, err := testQueries.CreateAccount(ctx, acc2Arg)
+	require.NoError(t, err)
 
 	log.Printf("Before Transfer: \nAccount1 Balance: %d\nAccount2 Balance: %d\n", account1.Balance, account2.Balance)
 
@@ -203,7 +343,7 @@ func TestBilateralTransferTxDeadlock(t *testing.T) {
 		require.NoError(t, err)
 
 		result := <-results
-
+		// collect IDs for cleanup
 		transferIDs = append(transferIDs, result.Transfer.ID)
 		entryIDs = append(entryIDs, result.FromEntry.ID, result.ToEntry.ID)
 	}
