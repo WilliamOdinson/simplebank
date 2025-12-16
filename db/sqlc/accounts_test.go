@@ -81,9 +81,17 @@ func TestDeleteAccount(t *testing.T) {
 }
 
 func TestListAccounts(t *testing.T) {
+	var createdIDs []int64
 	for i := 0; i < 10; i++ {
-		createRandomAccount(t)
+		acc, _ := createRandomAccount(t)
+		createdIDs = append(createdIDs, acc.ID)
 	}
+
+	t.Cleanup(func() {
+		for _, id := range createdIDs {
+			_ = testQueries.DeleteAccount(context.Background(), id)
+		}
+	})
 
 	arg := ListAccountsParams{
 		Limit:  5,
