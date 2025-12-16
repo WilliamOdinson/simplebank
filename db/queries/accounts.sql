@@ -33,7 +33,7 @@ UPDATE accounts
 WHERE id = $1
 RETURNING *;
 
--- name: AddAccountBalance :one
+-- name: ChangeAccountBalance :one
 UPDATE accounts
   set balance = balance + sqlc.arg(amount)
 WHERE id = sqlc.arg(id)
