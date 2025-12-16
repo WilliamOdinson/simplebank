@@ -31,7 +31,7 @@ func TestCreateEntry(t *testing.T) {
 
 	t.Cleanup(func() {
 		deleteEntry(t, entry.ID)
-		testQueries.DeleteAccount(ctx, acc.ID)
+		_ = testQueries.DeleteAccount(ctx, acc.ID)
 	})
 }
 
@@ -39,11 +39,17 @@ func TestGetEntry(t *testing.T) {
 	ctx := context.Background()
 
 	acc, _ := createRandomAccount(t)
+
 	ent1, err := testQueries.CreateEntry(ctx, CreateEntryParams{
 		AccountID: acc.ID,
 		Amount:    int64(gofakeit.Price(-10000, 10000)),
 	})
 	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		deleteEntry(t, ent1.ID)
+		_ = testQueries.DeleteAccount(ctx, acc.ID)
+	})
 
 	ent2, err := testQueries.GetEntry(ctx, ent1.ID)
 	require.NoError(t, err)
@@ -59,11 +65,6 @@ func TestGetEntry(t *testing.T) {
 	t1 := ent1.CreatedAt.Time.UTC()
 	t2 := ent2.CreatedAt.Time.UTC()
 	require.WithinDuration(t, t1, t2, time.Second)
-
-	t.Cleanup(func() {
-		deleteEntry(t, ent2.ID)
-		testQueries.DeleteAccount(ctx, acc.ID)
-	})
 }
 
 func TestListEntries(t *testing.T) {
@@ -85,7 +86,7 @@ func TestListEntries(t *testing.T) {
 		for _, id := range createdIDs {
 			deleteEntry(t, id)
 		}
-		testQueries.DeleteAccount(ctx, acc.ID)
+		_ = testQueries.DeleteAccount(ctx, acc.ID)
 	})
 
 	arg := ListEntriesParams{

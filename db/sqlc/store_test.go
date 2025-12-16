@@ -10,10 +10,12 @@ import (
 )
 
 func TestTransferTx(t *testing.T) {
+	ctx := context.Background()
 	store := NewStore(testPool)
 
 	account1, _ := createRandomAccount(t)
 	account2, _ := createRandomAccount(t)
+
 	log.Printf("Before Transfer: \nAccount1 Balance: %d\nAccount2 Balance: %d\n", account1.Balance, account2.Balance)
 
 	n := 5
@@ -22,11 +24,16 @@ func TestTransferTx(t *testing.T) {
 
 	errs := make(chan error)
 	results := make(chan TransferTxResult)
+
 	existed := make(map[int]bool)
+
+	// collect all created transfer and entry IDs for cleanup.
+	var transferIDs []int64
+	var entryIDs []int64
 
 	for i := 0; i < n; i++ {
 		go func() {
-			result, err := store.TransferTx(context.Background(), TransferTxParams{
+			result, err := store.TransferTx(ctx, TransferTxParams{
 				FromAccountID: account1.ID,
 				ToAccountID:   account2.ID,
 				Amount:        amount,
@@ -53,6 +60,10 @@ func TestTransferTx(t *testing.T) {
 		result := <-results
 		require.NotEmpty(t, result)
 
+		// collect IDs for cleanup
+		transferIDs = append(transferIDs, result.Transfer.ID)
+		entryIDs = append(entryIDs, result.FromEntry.ID, result.ToEntry.ID)
+
 		// check transfer
 		transfer := result.Transfer
 		require.NotEmpty(t, transfer)
@@ -62,7 +73,7 @@ func TestTransferTx(t *testing.T) {
 		require.NotZero(t, transfer.ID)
 		require.NotZero(t, transfer.CreatedAt)
 
-		_, err = store.GetTransfer(context.Background(), transfer.ID)
+		_, err = store.GetTransfer(ctx, transfer.ID)
 		require.NoError(t, err)
 
 		// check from entry
@@ -73,7 +84,7 @@ func TestTransferTx(t *testing.T) {
 		require.NotZero(t, fromEntry.ID)
 		require.NotZero(t, fromEntry.CreatedAt)
 
-		_, err = store.GetEntry(context.Background(), fromEntry.ID)
+		_, err = store.GetEntry(ctx, fromEntry.ID)
 		require.NoError(t, err)
 
 		// check to entry
@@ -84,7 +95,7 @@ func TestTransferTx(t *testing.T) {
 		require.NotZero(t, toEntry.ID)
 		require.NotZero(t, toEntry.CreatedAt)
 
-		_, err = store.GetEntry(context.Background(), toEntry.ID)
+		_, err = store.GetEntry(ctx, toEntry.ID)
 		require.NoError(t, err)
 
 		// check accounts
@@ -98,7 +109,7 @@ func TestTransferTx(t *testing.T) {
 
 		log.Printf("Tx %d: FromAccount Balance: %d, ToAccount Balance: %d\n", i+1, fromAccount.Balance, toAccount.Balance)
 
-		// check  accounts' balance
+		// check accounts' balance
 		diff1 := account1.Balance - fromAccount.Balance
 		diff2 := toAccount.Balance - account2.Balance
 		require.Equal(t, diff1, diff2)
@@ -113,23 +124,37 @@ func TestTransferTx(t *testing.T) {
 	}
 
 	// check the final updated balance
-	updatedAccount1, err := store.GetAccount(context.Background(), account1.ID)
+	updatedAccount1, err := store.GetAccount(ctx, account1.ID)
 	require.NoError(t, err)
 
-	updatedAccount2, err := store.GetAccount(context.Background(), account2.ID)
+	updatedAccount2, err := store.GetAccount(ctx, account2.ID)
 	require.NoError(t, err)
 
 	log.Printf("After Transfer: \nAccount1 Balance: %d\nAccount2 Balance: %d\n", updatedAccount1.Balance, updatedAccount2.Balance)
 
 	require.Equal(t, account1.Balance-int64(n)*amount, updatedAccount1.Balance)
 	require.Equal(t, account2.Balance+int64(n)*amount, updatedAccount2.Balance)
+
+	// cleanup
+	t.Cleanup(func() {
+		for _, id := range transferIDs {
+			deleteTransfer(t, id)
+		}
+		for _, id := range entryIDs {
+			deleteEntry(t, id)
+		}
+		_ = testQueries.DeleteAccount(ctx, account2.ID)
+		_ = testQueries.DeleteAccount(ctx, account1.ID)
+	})
 }
 
 func TestBilateralTransferTxDeadlock(t *testing.T) {
+	ctx := context.Background()
 	store := NewStore(testPool)
 
 	account1, _ := createRandomAccount(t)
 	account2, _ := createRandomAccount(t)
+
 	log.Printf("Before Transfer: \nAccount1 Balance: %d\nAccount2 Balance: %d\n", account1.Balance, account2.Balance)
 
 	n := 10
@@ -137,6 +162,11 @@ func TestBilateralTransferTxDeadlock(t *testing.T) {
 	amount := int64(gofakeit.Number(1, 100))
 
 	errs := make(chan error)
+	results := make(chan TransferTxResult)
+
+	// collect all created transfer and entry IDs for cleanup.
+	var transferIDs []int64
+	var entryIDs []int64
 
 	for i := 0; i < n; i++ {
 		fromAccountID := account1.ID
@@ -146,8 +176,9 @@ func TestBilateralTransferTxDeadlock(t *testing.T) {
 			fromAccountID = account2.ID
 			toAccountID = account1.ID
 		}
+
 		go func() {
-			_, err := store.TransferTx(context.Background(), TransferTxParams{
+			result, err := store.TransferTx(ctx, TransferTxParams{
 				FromAccountID: fromAccountID,
 				ToAccountID:   toAccountID,
 				Amount:        amount,
@@ -158,6 +189,7 @@ func TestBilateralTransferTxDeadlock(t *testing.T) {
 			}
 
 			errs <- err
+			results <- result
 		}()
 	}
 
@@ -169,17 +201,34 @@ func TestBilateralTransferTxDeadlock(t *testing.T) {
 		}
 
 		require.NoError(t, err)
+
+		result := <-results
+
+		transferIDs = append(transferIDs, result.Transfer.ID)
+		entryIDs = append(entryIDs, result.FromEntry.ID, result.ToEntry.ID)
 	}
 
 	// check the final updated balance
-	updatedAccount1, err := store.GetAccount(context.Background(), account1.ID)
+	updatedAccount1, err := store.GetAccount(ctx, account1.ID)
 	require.NoError(t, err)
 
-	updatedAccount2, err := store.GetAccount(context.Background(), account2.ID)
+	updatedAccount2, err := store.GetAccount(ctx, account2.ID)
 	require.NoError(t, err)
 
 	log.Printf("After Transfer: \nAccount1 Balance: %d\nAccount2 Balance: %d\n", updatedAccount1.Balance, updatedAccount2.Balance)
 
 	require.Equal(t, account1.Balance, updatedAccount1.Balance)
 	require.Equal(t, account2.Balance, updatedAccount2.Balance)
+
+	// cleanup
+	t.Cleanup(func() {
+		for _, id := range transferIDs {
+			deleteTransfer(t, id)
+		}
+		for _, id := range entryIDs {
+			deleteEntry(t, id)
+		}
+		_ = testQueries.DeleteAccount(ctx, account2.ID)
+		_ = testQueries.DeleteAccount(ctx, account1.ID)
+	})
 }
