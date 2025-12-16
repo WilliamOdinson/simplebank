@@ -15,4 +15,7 @@ migratedown:
 	migrate -path db/migrations -database "postgresql://root:secret@localhost:5432/simple_bank?sslmode=disable" --verbose down
 	@echo "Migration rolled back"
 
-.PHONY: createdb dropdb postgres migrateup migratedown
+sqlc:
+	sqlc generate
+
+.PHONY: createdb dropdb postgres migrateup migratedown sqlc
