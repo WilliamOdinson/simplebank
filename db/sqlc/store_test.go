@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"log"
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v7"
@@ -13,6 +14,7 @@ func TestTransferTx(t *testing.T) {
 
 	account1, _ := createRandomAccount(t)
 	account2, _ := createRandomAccount(t)
+	log.Printf("Before Transfer: \nAccount1 Balance: %d\nAccount2 Balance: %d\n", account1.Balance, account2.Balance)
 
 	n := 5
 
@@ -20,6 +22,7 @@ func TestTransferTx(t *testing.T) {
 
 	errs := make(chan error)
 	results := make(chan TransferTxResult)
+	existed := make(map[int]bool)
 
 	for i := 0; i < n; i++ {
 		go func() {
@@ -84,6 +87,40 @@ func TestTransferTx(t *testing.T) {
 		_, err = store.GetEntry(context.Background(), toEntry.ID)
 		require.NoError(t, err)
 
-		// TODO: check accounts' balance
+		// check accounts
+		fromAccount := result.FromAccount
+		require.NotEmpty(t, fromAccount)
+		require.Equal(t, account1.ID, fromAccount.ID)
+
+		toAccount := result.ToAccount
+		require.NotEmpty(t, toAccount)
+		require.Equal(t, account2.ID, toAccount.ID)
+
+		log.Printf("Tx %d: FromAccount Balance: %d, ToAccount Balance: %d\n", i+1, fromAccount.Balance, toAccount.Balance)
+
+		// check  accounts' balance
+		diff1 := account1.Balance - fromAccount.Balance
+		diff2 := toAccount.Balance - account2.Balance
+		require.Equal(t, diff1, diff2)
+		require.True(t, diff1 > 0)
+		require.True(t, diff1%amount == 0) // multiple of amount
+
+		// check how many times the amount has been transferred
+		k := int(diff1 / amount)
+		require.True(t, k >= 1 && k <= n)
+		require.NotContains(t, existed, k)
+		existed[k] = true
 	}
+
+	// check the final updated balance
+	updatedAccount1, err := store.GetAccount(context.Background(), account1.ID)
+	require.NoError(t, err)
+
+	updatedAccount2, err := store.GetAccount(context.Background(), account2.ID)
+	require.NoError(t, err)
+
+	log.Printf("After Transfer: \nAccount1 Balance: %d\nAccount2 Balance: %d\n", updatedAccount1.Balance, updatedAccount2.Balance)
+
+	require.Equal(t, account1.Balance-int64(n)*amount, updatedAccount1.Balance)
+	require.Equal(t, account2.Balance+int64(n)*amount, updatedAccount2.Balance)
 }
