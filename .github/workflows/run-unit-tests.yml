@@ -53,6 +53,14 @@ jobs:
       - name: Generate sqlc code
         run: sqlc generate
 
+      - name: Install mockgen
+        run: |
+          go install go.uber.org/mock/mockgen@latest
+          mockgen -version
+
+      - name: Generate mocks
+        run: mockgen -destination db/mock/store.go -package mockdb github.com/WilliamOdinson/simplebank/db/sqlc Store
+
       - name: Install golang-migrate
         run: |
           go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.0
