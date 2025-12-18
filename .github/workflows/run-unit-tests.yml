@@ -40,6 +40,10 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache: true
+
+      - name: move app.env.example to app.env
+        run: mv ./app.env.example ./app.env
 
       - name: Install sqlc
         uses: sqlc-dev/setup-sqlc@v4
