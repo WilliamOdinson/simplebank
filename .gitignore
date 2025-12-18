@@ -127,5 +127,6 @@ db/sqlc/db.go
 db/sqlc/models.go
 db/sqlc/querier.go
 db/sqlc/*sql.go
+db/mock/store.go
 
 *.env
