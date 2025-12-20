@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -89,6 +90,20 @@ func TestGetAccountAPI(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:      "NegativeID",
+			accountID: -1,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					GetAccount(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -113,6 +128,459 @@ func TestGetAccountAPI(t *testing.T) {
 			server.router.ServeHTTP(recorder, request)
 			tc.checkResponse(t, recorder)
 		})
+	}
+}
+
+func TestCreateAccountAPI(t *testing.T) {
+	account := randomAccount()
+
+	testCases := []struct {
+		name          string
+		body          map[string]any
+		buildStubs    func(store *mockdb.MockStore)
+		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
+	}{
+		{
+			name: "OK",
+			body: map[string]any{
+				"owner":    account.Owner,
+				"currency": "USD",
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					CreateAccount(gomock.Any(), db.CreateAccountParams{
+						Owner:    account.Owner,
+						Currency: "USD",
+						Balance:  0,
+					}).
+					Times(1).
+					Return(db.Account{
+						ID:       account.ID,
+						Owner:    account.Owner,
+						Currency: "USD",
+						Balance:  0,
+					}, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusOK {
+					t.Errorf("expected status code 200, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "InternalError",
+			body: map[string]any{
+				"owner":    account.Owner,
+				"currency": "USD",
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					CreateAccount(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(db.Account{}, fmt.Errorf("internal error"))
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusInternalServerError {
+					t.Errorf("expected status code 500, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "InvalidCurrency",
+			body: map[string]any{
+				"owner":    account.Owner,
+				"currency": "INVALID",
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					CreateAccount(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "MissingOwner",
+			body: map[string]any{
+				"currency": "USD",
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					CreateAccount(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "MissingCurrency",
+			body: map[string]any{
+				"owner": account.Owner,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					CreateAccount(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "EUR_Currency",
+			body: map[string]any{
+				"owner":    account.Owner,
+				"currency": "EUR",
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					CreateAccount(gomock.Any(), db.CreateAccountParams{
+						Owner:    account.Owner,
+						Currency: "EUR",
+						Balance:  0,
+					}).
+					Times(1).
+					Return(db.Account{
+						ID:       account.ID,
+						Owner:    account.Owner,
+						Currency: "EUR",
+						Balance:  0,
+					}, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusOK {
+					t.Errorf("expected status code 200, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "CNY_Currency",
+			body: map[string]any{
+				"owner":    account.Owner,
+				"currency": "CNY",
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					CreateAccount(gomock.Any(), db.CreateAccountParams{
+						Owner:    account.Owner,
+						Currency: "CNY",
+						Balance:  0,
+					}).
+					Times(1).
+					Return(db.Account{
+						ID:       account.ID,
+						Owner:    account.Owner,
+						Currency: "CNY",
+						Balance:  0,
+					}, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusOK {
+					t.Errorf("expected status code 200, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "InvalidJSON",
+			body: nil,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					CreateAccount(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// 1. Setup controller and mock store
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			// 2. Build stubs
+			store := mockdb.NewMockStore(ctrl)
+			tc.buildStubs(store)
+
+			// 3. Create server and recorder
+			server := NewServer(store)
+			recorder := httptest.NewRecorder()
+
+			// 4. Create request body
+			var body []byte
+			if tc.body != nil {
+				body, _ = json.Marshal(tc.body)
+			} else {
+				body = []byte("invalid json")
+			}
+			request := httptest.NewRequest(http.MethodPost, "/accounts", bytes.NewReader(body))
+			request.Header.Set("Content-Type", "application/json")
+
+			// 5. Serve the request
+			server.router.ServeHTTP(recorder, request)
+			tc.checkResponse(t, recorder)
+		})
+	}
+}
+
+func TestListAccountsAPI(t *testing.T) {
+	n := 5
+	accounts := make([]db.Account, n)
+	for i := 0; i < n; i++ {
+		accounts[i] = randomAccount()
+	}
+
+	testCases := []struct {
+		name          string
+		pageID        int32
+		pageSize      int32
+		buildStubs    func(store *mockdb.MockStore)
+		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
+	}{
+		{
+			name:     "OK",
+			pageID:   1,
+			pageSize: 5,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					ListAccounts(gomock.Any(), db.ListAccountsParams{
+						Limit:  5,
+						Offset: 0,
+					}).
+					Times(1).
+					Return(accounts, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusOK {
+					t.Errorf("expected status code 200, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name:     "SecondPage",
+			pageID:   2,
+			pageSize: 5,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					ListAccounts(gomock.Any(), db.ListAccountsParams{
+						Limit:  5,
+						Offset: 5,
+					}).
+					Times(1).
+					Return(accounts, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusOK {
+					t.Errorf("expected status code 200, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name:     "MaxPageSize",
+			pageID:   1,
+			pageSize: 10,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					ListAccounts(gomock.Any(), db.ListAccountsParams{
+						Limit:  10,
+						Offset: 0,
+					}).
+					Times(1).
+					Return(accounts, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusOK {
+					t.Errorf("expected status code 200, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name:     "InternalError",
+			pageID:   1,
+			pageSize: 5,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					ListAccounts(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(nil, fmt.Errorf("internal error"))
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusInternalServerError {
+					t.Errorf("expected status code 500, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name:     "InvalidPageID",
+			pageID:   0,
+			pageSize: 5,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					ListAccounts(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name:     "NegativePageID",
+			pageID:   -1,
+			pageSize: 5,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					ListAccounts(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name:     "PageSizeTooSmall",
+			pageID:   1,
+			pageSize: 4,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					ListAccounts(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name:     "PageSizeTooLarge",
+			pageID:   1,
+			pageSize: 11,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					ListAccounts(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// 1. Setup controller and mock store
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			// 2. Build stubs
+			store := mockdb.NewMockStore(ctrl)
+			tc.buildStubs(store)
+
+			// 3. Create server and recorder
+			server := NewServer(store)
+			recorder := httptest.NewRecorder()
+
+			// 4. Create request
+			url := fmt.Sprintf("/accounts?page_id=%d&page_size=%d", tc.pageID, tc.pageSize)
+			request := httptest.NewRequest(http.MethodGet, url, nil)
+
+			// 5. Serve the request
+			server.router.ServeHTTP(recorder, request)
+			tc.checkResponse(t, recorder)
+		})
+	}
+}
+
+func TestListAccountsAPI_MissingParams(t *testing.T) {
+	testCases := []struct {
+		name          string
+		url           string
+		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
+	}{
+		{
+			name: "MissingPageID",
+			url:  "/accounts?page_size=5",
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "MissingPageSize",
+			url:  "/accounts?page_id=1",
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "MissingBothParams",
+			url:  "/accounts",
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// 1. Setup controller and mock store
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			// 2. Create mock store
+			store := mockdb.NewMockStore(ctrl)
+			store.EXPECT().
+				ListAccounts(gomock.Any(), gomock.Any()).
+				Times(0)
+
+			// 3. Create server and recorder
+			server := NewServer(store)
+			recorder := httptest.NewRecorder()
+
+			// 4. Create request
+			request := httptest.NewRequest(http.MethodGet, tc.url, nil)
+
+			// 5. Serve the request
+			server.router.ServeHTTP(recorder, request)
+			tc.checkResponse(t, recorder)
+		})
+	}
+}
+
+func TestServerStart(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	store := mockdb.NewMockStore(ctrl)
+	server := NewServer(store)
+
+	// Test that Start returns an error for invalid address
+	err := server.Start("invalid-address-that-will-fail")
+	if err == nil {
+		t.Error("expected error for invalid address, got nil")
 	}
 }
 
