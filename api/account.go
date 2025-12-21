@@ -11,7 +11,7 @@ import (
 // only allow the owner and currency to be set when creating an account
 type createAccountRequest struct {
 	Owner    string `json:"owner" binding:"required"`
-	Currency string `json:"currency" binding:"required,oneof=USD EUR CNY"`
+	Currency string `json:"currency" binding:"required,currency"`
 }
 
 // to get account by id from the URI
