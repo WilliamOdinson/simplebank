@@ -262,29 +262,19 @@ func TestCreateAccountAPI(t *testing.T) {
 			},
 		},
 		{
-			name: "CNY_Currency",
+			name: "UnsupportedCurrency_CNY",
 			body: map[string]any{
 				"owner":    account.Owner,
 				"currency": "CNY",
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().
-					CreateAccount(gomock.Any(), db.CreateAccountParams{
-						Owner:    account.Owner,
-						Currency: "CNY",
-						Balance:  0,
-					}).
-					Times(1).
-					Return(db.Account{
-						ID:       account.ID,
-						Owner:    account.Owner,
-						Currency: "CNY",
-						Balance:  0,
-					}, nil)
+					CreateAccount(gomock.Any(), gomock.Any()).
+					Times(0)
 			},
 			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
-				if recorder.Code != http.StatusOK {
-					t.Errorf("expected status code 200, got %d", recorder.Code)
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
 				}
 			},
 		},
