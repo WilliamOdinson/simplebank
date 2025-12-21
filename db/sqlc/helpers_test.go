@@ -4,8 +4,15 @@ import (
 	"context"
 	"testing"
 
+	"github.com/WilliamOdinson/simplebank/util"
 	"github.com/brianvoe/gofakeit/v7"
 )
+
+var supportedCurrencies = []string{util.USD, util.EUR, util.CAD}
+
+func randomCurrency() string {
+	return supportedCurrencies[gofakeit.Number(0, len(supportedCurrencies)-1)]
+}
 
 func createRandomAccount(t *testing.T) (Account, CreateAccountParams) {
 	t.Helper()
@@ -13,7 +20,7 @@ func createRandomAccount(t *testing.T) (Account, CreateAccountParams) {
 	arg := CreateAccountParams{
 		Owner:    gofakeit.Name(),
 		Balance:  int64(gofakeit.Price(0, 10000)),
-		Currency: gofakeit.CurrencyShort(),
+		Currency: randomCurrency(),
 	}
 
 	acc, err := testQueries.CreateAccount(context.Background(), arg)
