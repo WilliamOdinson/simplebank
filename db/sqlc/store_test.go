@@ -162,6 +162,17 @@ func TestTransferTx(t *testing.T) {
 	})
 }
 
+func TestQueriesWithTx(t *testing.T) {
+	ctx := context.Background()
+	tx, err := testPool.Begin(ctx)
+	require.NoError(t, err)
+	defer tx.Rollback(ctx)
+
+	q := New(testPool)
+	qtx := q.WithTx(tx)
+	require.NotNil(t, qtx)
+}
+
 func TestTransferTxSameAccountConstraint(t *testing.T) {
 	ctx := context.Background()
 	store := NewStore(testPool)
