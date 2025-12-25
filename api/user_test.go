@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	mockdb "github.com/WilliamOdinson/simplebank/db/mock"
@@ -15,6 +16,34 @@ import (
 	"github.com/lib/pq"
 	"go.uber.org/mock/gomock"
 )
+
+type eqCreateUserParamsMatcher struct {
+	arg      db.CreateUserParams
+	password string
+}
+
+func (e eqCreateUserParamsMatcher) Matches(x any) bool {
+	arg, ok := x.(db.CreateUserParams)
+	if !ok {
+		return false
+	}
+
+	err := util.CheckPassword(e.password, arg.HashedPassword)
+	if err != nil {
+		return false
+	}
+
+	e.arg.HashedPassword = arg.HashedPassword
+	return reflect.DeepEqual(e.arg, arg)
+}
+
+func (e eqCreateUserParamsMatcher) String() string {
+	return fmt.Sprintf("matches arg %v and password %v", e.arg, e.password)
+}
+
+func EqCreateUserParams(arg db.CreateUserParams, password string) gomock.Matcher {
+	return eqCreateUserParamsMatcher{arg, password}
+}
 
 func TestCreateUserAPI(t *testing.T) {
 	user, password := randomUser(t)
@@ -34,14 +63,32 @@ func TestCreateUserAPI(t *testing.T) {
 				"email":     user.Email,
 			},
 			buildStubs: func(store *mockdb.MockStore) {
+				arg := db.CreateUserParams{
+					Username: user.Username,
+					FullName: user.FullName,
+					Email:    user.Email,
+				}
 				store.EXPECT().
-					CreateUser(gomock.Any(), gomock.Any()).
+					CreateUser(gomock.Any(), EqCreateUserParams(arg, password)).
 					Times(1).
 					Return(user, nil)
 			},
 			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
 				if recorder.Code != http.StatusOK {
 					t.Errorf("expected status code 200, got %d", recorder.Code)
+				}
+				var resp createUserResponse
+				if err := json.NewDecoder(recorder.Body).Decode(&resp); err != nil {
+					t.Fatalf("failed to decode response body: %v", err)
+				}
+				if resp.Username != user.Username {
+					t.Errorf("expected username %s, got %s", user.Username, resp.Username)
+				}
+				if resp.FullName != user.FullName {
+					t.Errorf("expected full_name %s, got %s", user.FullName, resp.FullName)
+				}
+				if resp.Email != user.Email {
+					t.Errorf("expected email %s, got %s", user.Email, resp.Email)
 				}
 			},
 		},
@@ -67,6 +114,26 @@ func TestCreateUserAPI(t *testing.T) {
 		},
 		{
 			name: "DuplicateUsername",
+			body: map[string]any{
+				"username":  user.Username,
+				"password":  password,
+				"full_name": user.FullName,
+				"email":     user.Email,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					CreateUser(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(db.User{}, &pq.Error{Code: "23505"})
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusForbidden {
+					t.Errorf("expected status code 403, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "DuplicateEmail",
 			body: map[string]any{
 				"username":  user.Username,
 				"password":  password,
