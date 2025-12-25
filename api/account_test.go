@@ -12,6 +12,7 @@ import (
 	mockdb "github.com/WilliamOdinson/simplebank/db/mock"
 	db "github.com/WilliamOdinson/simplebank/db/sqlc"
 	"github.com/brianvoe/gofakeit/v7"
+	"github.com/lib/pq"
 	"go.uber.org/mock/gomock"
 )
 
@@ -289,6 +290,42 @@ func TestCreateAccountAPI(t *testing.T) {
 			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
 				if recorder.Code != http.StatusBadRequest {
 					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "ForeignKeyViolation",
+			body: map[string]any{
+				"owner":    "nonexistent_user",
+				"currency": "USD",
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					CreateAccount(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(db.Account{}, &pq.Error{Code: "23503"})
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusForbidden {
+					t.Errorf("expected status code 403, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "UniqueViolation",
+			body: map[string]any{
+				"owner":    account.Owner,
+				"currency": "USD",
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					CreateAccount(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(db.Account{}, &pq.Error{Code: "23505"})
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusForbidden {
+					t.Errorf("expected status code 403, got %d", recorder.Code)
 				}
 			},
 		},
