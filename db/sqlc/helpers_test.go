@@ -41,7 +41,20 @@ func createRandomAccount(t *testing.T) (Account, CreateAccountParams) {
 		Balance:  int64(gofakeit.Price(0, 10000)),
 		Currency: randomCurrency(),
 	}
+	acc, err := testQueries.CreateAccount(context.Background(), arg)
+	if err != nil {
+		t.Fatal("Cannot create account:", err)
+	}
+	return acc, arg
+}
 
+func createRandomAccountForUser(t *testing.T, username string, currency string) (Account, CreateAccountParams) {
+	t.Helper()
+	arg := CreateAccountParams{
+		Owner:    username,
+		Balance:  int64(gofakeit.Price(0, 10000)),
+		Currency: currency,
+	}
 	acc, err := testQueries.CreateAccount(context.Background(), arg)
 
 	if err != nil {

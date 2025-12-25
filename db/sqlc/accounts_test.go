@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/WilliamOdinson/simplebank/util"
 	"github.com/brianvoe/gofakeit/v7"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
@@ -93,30 +94,34 @@ func TestDeleteAccount(t *testing.T) {
 
 func TestListAccounts(t *testing.T) {
 	ctx := context.Background()
-	var createdAccounts []Account
-	for i := 0; i < 10; i++ {
-		acc, _ := createRandomAccount(t)
-		createdAccounts = append(createdAccounts, acc)
+	user, _ := createRandomUser(t)
+
+	currencies := []string{util.USD, util.EUR, util.CAD}
+	var createdIDs []int64
+	for _, currency := range currencies {
+		acc, _ := createRandomAccountForUser(t, user.Username, currency)
+		createdIDs = append(createdIDs, acc.ID)
 	}
 
 	t.Cleanup(func() {
-		for _, acc := range createdAccounts {
-			_ = testQueries.DeleteAccount(ctx, acc.ID)
-			deleteUser(t, acc.Owner)
+		for _, id := range createdIDs {
+			_ = testQueries.DeleteAccount(ctx, id)
 		}
+		deleteUser(t, user.Username)
 	})
 
 	arg := ListAccountsParams{
-		Limit:  5,
-		Offset: 5,
+		Owner:  user.Username,
+		Limit:  3,
+		Offset: 0,
 	}
 
 	accounts, err := testQueries.ListAccounts(ctx, arg)
 	require.NoError(t, err)
-	require.Len(t, accounts, 5)
-
+	require.Len(t, accounts, 3)
 	for _, acc := range accounts {
 		require.NotEmpty(t, acc)
+		require.Equal(t, user.Username, acc.Owner)
 	}
 }
 
