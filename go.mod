@@ -5,11 +5,12 @@ go 1.25.0
 require (
 	github.com/brianvoe/gofakeit/v7 v7.12.1
 	github.com/gin-gonic/gin v1.11.0
-	github.com/go-playground/validator/v10 v10.29.0
+	github.com/go-playground/validator/v10 v10.30.1
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/mock v0.6.0
+	golang.org/x/crypto v0.46.0
 )
 
 require (
@@ -38,7 +39,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
-	github.com/quic-go/quic-go v0.57.1 // indirect
+	github.com/quic-go/quic-go v0.58.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/sagikazarmark/locafero v0.12.0 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
@@ -49,7 +50,6 @@ require (
 	github.com/ugorji/go/codec v1.3.1 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/arch v0.23.0 // indirect
-	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
