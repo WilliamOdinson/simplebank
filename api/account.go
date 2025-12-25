@@ -21,8 +21,9 @@ type getAccountRequest struct {
 
 // to list accounts with pagination
 type listAccountsRequest struct {
-	PageID   int32 `form:"page_id" binding:"required,min=1"`
-	PageSize int32 `form:"page_size" binding:"required,min=5,max=10"`
+	Owner    string `form:"owner" binding:"required"`
+	PageID   int32  `form:"page_id" binding:"required,min=1"`
+	PageSize int32  `form:"page_size" binding:"required,min=5,max=10"`
 }
 
 func (server *Server) createAccount(ctx *gin.Context) {
@@ -73,6 +74,7 @@ func (server *Server) listAccounts(ctx *gin.Context) {
 		return
 	}
 	accounts, err := server.store.ListAccounts(ctx, db.ListAccountsParams{
+		Owner:  req.Owner,
 		Limit:  req.PageSize,
 		Offset: (req.PageID - 1) * req.PageSize,
 	})

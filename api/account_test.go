@@ -326,14 +326,21 @@ func TestCreateAccountAPI(t *testing.T) {
 }
 
 func TestListAccountsAPI(t *testing.T) {
+	owner := gofakeit.Username()
 	n := 5
 	accounts := make([]db.Account, n)
 	for i := 0; i < n; i++ {
-		accounts[i] = randomAccount()
+		accounts[i] = db.Account{
+			ID:       gofakeit.Int64(),
+			Owner:    owner,
+			Balance:  int64(gofakeit.Price(0, 10000)),
+			Currency: "USD",
+		}
 	}
 
 	testCases := []struct {
 		name          string
+		owner         string
 		pageID        int32
 		pageSize      int32
 		buildStubs    func(store *mockdb.MockStore)
@@ -341,11 +348,13 @@ func TestListAccountsAPI(t *testing.T) {
 	}{
 		{
 			name:     "OK",
+			owner:    owner,
 			pageID:   1,
 			pageSize: 5,
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().
 					ListAccounts(gomock.Any(), db.ListAccountsParams{
+						Owner:  owner,
 						Limit:  5,
 						Offset: 0,
 					}).
@@ -360,11 +369,13 @@ func TestListAccountsAPI(t *testing.T) {
 		},
 		{
 			name:     "SecondPage",
+			owner:    owner,
 			pageID:   2,
 			pageSize: 5,
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().
 					ListAccounts(gomock.Any(), db.ListAccountsParams{
+						Owner:  owner,
 						Limit:  5,
 						Offset: 5,
 					}).
@@ -379,11 +390,13 @@ func TestListAccountsAPI(t *testing.T) {
 		},
 		{
 			name:     "MaxPageSize",
+			owner:    owner,
 			pageID:   1,
 			pageSize: 10,
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().
 					ListAccounts(gomock.Any(), db.ListAccountsParams{
+						Owner:  owner,
 						Limit:  10,
 						Offset: 0,
 					}).
@@ -398,6 +411,7 @@ func TestListAccountsAPI(t *testing.T) {
 		},
 		{
 			name:     "InternalError",
+			owner:    owner,
 			pageID:   1,
 			pageSize: 5,
 			buildStubs: func(store *mockdb.MockStore) {
@@ -414,6 +428,7 @@ func TestListAccountsAPI(t *testing.T) {
 		},
 		{
 			name:     "InvalidPageID",
+			owner:    owner,
 			pageID:   0,
 			pageSize: 5,
 			buildStubs: func(store *mockdb.MockStore) {
@@ -429,6 +444,7 @@ func TestListAccountsAPI(t *testing.T) {
 		},
 		{
 			name:     "NegativePageID",
+			owner:    owner,
 			pageID:   -1,
 			pageSize: 5,
 			buildStubs: func(store *mockdb.MockStore) {
@@ -444,6 +460,7 @@ func TestListAccountsAPI(t *testing.T) {
 		},
 		{
 			name:     "PageSizeTooSmall",
+			owner:    owner,
 			pageID:   1,
 			pageSize: 4,
 			buildStubs: func(store *mockdb.MockStore) {
@@ -459,6 +476,7 @@ func TestListAccountsAPI(t *testing.T) {
 		},
 		{
 			name:     "PageSizeTooLarge",
+			owner:    owner,
 			pageID:   1,
 			pageSize: 11,
 			buildStubs: func(store *mockdb.MockStore) {
@@ -489,7 +507,7 @@ func TestListAccountsAPI(t *testing.T) {
 			recorder := httptest.NewRecorder()
 
 			// 4. Create request
-			url := fmt.Sprintf("/accounts?page_id=%d&page_size=%d", tc.pageID, tc.pageSize)
+			url := fmt.Sprintf("/accounts?owner=%s&page_id=%d&page_size=%d", tc.owner, tc.pageID, tc.pageSize)
 			request := httptest.NewRequest(http.MethodGet, url, nil)
 
 			// 5. Serve the request
@@ -500,14 +518,25 @@ func TestListAccountsAPI(t *testing.T) {
 }
 
 func TestListAccountsAPI_MissingParams(t *testing.T) {
+	owner := gofakeit.Username()
+
 	testCases := []struct {
 		name          string
 		url           string
 		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
 	}{
 		{
+			name: "MissingOwner",
+			url:  "/accounts?page_id=1&page_size=5",
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
+		{
 			name: "MissingPageID",
-			url:  "/accounts?page_size=5",
+			url:  fmt.Sprintf("/accounts?owner=%s&page_size=5", owner),
 			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
 				if recorder.Code != http.StatusBadRequest {
 					t.Errorf("expected status code 400, got %d", recorder.Code)
@@ -516,7 +545,7 @@ func TestListAccountsAPI_MissingParams(t *testing.T) {
 		},
 		{
 			name: "MissingPageSize",
-			url:  "/accounts?page_id=1",
+			url:  fmt.Sprintf("/accounts?owner=%s&page_id=1", owner),
 			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
 				if recorder.Code != http.StatusBadRequest {
 					t.Errorf("expected status code 400, got %d", recorder.Code)
@@ -524,7 +553,7 @@ func TestListAccountsAPI_MissingParams(t *testing.T) {
 			},
 		},
 		{
-			name: "MissingBothParams",
+			name: "MissingAllParams",
 			url:  "/accounts",
 			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
 				if recorder.Code != http.StatusBadRequest {
