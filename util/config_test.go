@@ -1,0 +1,21 @@
+package util
+
+import (
+	"testing"
+
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/require"
+)
+
+func TestLoadConfig(t *testing.T) {
+	config, err := LoadConfig("..")
+	require.NoError(t, err)
+	require.NotEmpty(t, config.DBSource)
+	require.NotEmpty(t, config.ServerAddress)
+}
+
+func TestLoadConfigNotFound(t *testing.T) {
+	viper.Reset()
+	_, err := LoadConfig("/nonexistent/path")
+	require.Error(t, err)
+}
