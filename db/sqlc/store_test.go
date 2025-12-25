@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"log"
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v7"
@@ -34,8 +33,6 @@ func TestTransferTx(t *testing.T) {
 	}
 	account2, err := testQueries.CreateAccount(ctx, acc2Arg)
 	require.NoError(t, err)
-
-	log.Printf("Before Transfer: \nAccount1 Balance: %d\nAccount2 Balance: %d\n", account1.Balance, account2.Balance)
 
 	n := 5
 
@@ -126,8 +123,6 @@ func TestTransferTx(t *testing.T) {
 		require.NotEmpty(t, toAccount)
 		require.Equal(t, account2.ID, toAccount.ID)
 
-		log.Printf("Tx %d: FromAccount Balance: %d, ToAccount Balance: %d\n", i+1, fromAccount.Balance, toAccount.Balance)
-
 		// check accounts' balance
 		diff1 := account1.Balance - fromAccount.Balance
 		diff2 := toAccount.Balance - account2.Balance
@@ -148,8 +143,6 @@ func TestTransferTx(t *testing.T) {
 
 	updatedAccount2, err := store.GetAccount(ctx, account2.ID)
 	require.NoError(t, err)
-
-	log.Printf("After Transfer: \nAccount1 Balance: %d\nAccount2 Balance: %d\n", updatedAccount1.Balance, updatedAccount2.Balance)
 
 	require.Equal(t, account1.Balance-int64(n)*amount, updatedAccount1.Balance)
 	require.Equal(t, account2.Balance+int64(n)*amount, updatedAccount2.Balance)
@@ -313,8 +306,6 @@ func TestBilateralTransferTxDeadlock(t *testing.T) {
 	account2, err := testQueries.CreateAccount(ctx, acc2Arg)
 	require.NoError(t, err)
 
-	log.Printf("Before Transfer: \nAccount1 Balance: %d\nAccount2 Balance: %d\n", account1.Balance, account2.Balance)
-
 	n := 10
 
 	amount := int64(gofakeit.Number(1, 100))
@@ -373,8 +364,6 @@ func TestBilateralTransferTxDeadlock(t *testing.T) {
 
 	updatedAccount2, err := store.GetAccount(ctx, account2.ID)
 	require.NoError(t, err)
-
-	log.Printf("After Transfer: \nAccount1 Balance: %d\nAccount2 Balance: %d\n", updatedAccount1.Balance, updatedAccount2.Balance)
 
 	require.Equal(t, account1.Balance, updatedAccount1.Balance)
 	require.Equal(t, account2.Balance, updatedAccount2.Balance)
