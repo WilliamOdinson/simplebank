@@ -1,35 +1,51 @@
-postgres:
-	docker run --name simplebank -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=secret -d postgres:14-alpine
+NETWORK_NAME = simplebank-network
+CONTAINER_NAME = simplebank
+DB_CONTAINER = simplebank-db
+IMAGE_NAME = simplebank:latest
 
-createdb:
-	docker exec -it simplebank createdb --username=root --owner=root simple_bank
+include app.env
+export
 
-dropdb:
-	docker exec -it simplebank dropdb simple_bank
+initdb:
+	docker network create $(NETWORK_NAME)
+	docker run --name $(DB_CONTAINER) --network $(NETWORK_NAME) -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=secret -d postgres:14-alpine
+	@echo "Waiting for PostgreSQL to start..."
+	@sleep 3
+	docker exec -it $(DB_CONTAINER) createdb --username=root --owner=root simple_bank
+	migrate -path db/migrations -database $(DB_SOURCE) --verbose up
+	@echo "Database initialized"
 
 migrateup:
-	migrate -path db/migrations -database "postgresql://root:secret@localhost:5432/simple_bank?sslmode=disable" --verbose up
-	@echo "Migration completed"
+	migrate -path db/migrations -database $(DB_SOURCE) --verbose up 1
 
 migratedown:
-	migrate -path db/migrations -database "postgresql://root:secret@localhost:5432/simple_bank?sslmode=disable" --verbose down
-	@echo "Migration rolled back"
+	migrate -path db/migrations -database $(DB_SOURCE) --verbose down 1
 
-sqlc:
+generate:
 	sqlc generate
+	mockgen -destination db/mock/store.go -package mockdb github.com/WilliamOdinson/simplebank/db/sqlc Store
+	@echo "Code generated"
 
 test:
-	go test -v -cover ./...
+	go test -v -cover ./... -count=1
 
 coverage:
-	go test -v -coverprofile=coverage.out ./...
+	go test -coverprofile=coverage.out ./... -count=1
 	go tool cover -html=coverage.out -o coverage.html
 	rm -f coverage.out
 
 server:
-	go run main.go
+	docker build -t $(IMAGE_NAME) .
+	docker rm -f $(CONTAINER_NAME) || true
+	docker run --name $(CONTAINER_NAME) --network $(NETWORK_NAME) -p 8080:8080 -e DB_SOURCE="postgresql://root:secret@$(DB_CONTAINER):5432/simple_bank?sslmode=disable" -d $(IMAGE_NAME)
+	@echo "Server running on port 8080"
 
-mock:
-	mockgen -destination db/mock/store.go -package mockdb github.com/WilliamOdinson/simplebank/db/sqlc Store
+clean:
+	docker rm -f $(CONTAINER_NAME) $(DB_CONTAINER) || true
+	docker network rm $(NETWORK_NAME) || true
+	rm -f db/mock/store.go
+	rm -f db/sqlc/*.sql.go db/sqlc/db.go db/sqlc/models.go db/sqlc/querier.go
+	rm -f coverage.html
+	@echo "Cleaned up"
 
-.PHONY: createdb dropdb postgres migrateup migratedown sqlc test coverage server mock
+.PHONY: initdb migrateup migratedown generate test coverage server clean
