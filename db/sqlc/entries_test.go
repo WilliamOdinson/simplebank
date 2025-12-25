@@ -32,6 +32,7 @@ func TestCreateEntry(t *testing.T) {
 	t.Cleanup(func() {
 		deleteEntry(t, entry.ID)
 		_ = testQueries.DeleteAccount(ctx, acc.ID)
+		deleteUser(t, acc.Owner)
 	})
 }
 
@@ -49,6 +50,7 @@ func TestGetEntry(t *testing.T) {
 	t.Cleanup(func() {
 		deleteEntry(t, ent1.ID)
 		_ = testQueries.DeleteAccount(ctx, acc.ID)
+		deleteUser(t, acc.Owner)
 	})
 
 	ent2, err := testQueries.GetEntry(ctx, ent1.ID)
@@ -87,6 +89,7 @@ func TestListEntries(t *testing.T) {
 			deleteEntry(t, id)
 		}
 		_ = testQueries.DeleteAccount(ctx, acc.ID)
+		deleteUser(t, acc.Owner)
 	})
 
 	arg := ListEntriesParams{

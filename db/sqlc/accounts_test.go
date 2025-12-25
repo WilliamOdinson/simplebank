@@ -16,6 +16,7 @@ func TestCreateAccount(t *testing.T) {
 
 	t.Cleanup(func() {
 		_ = testQueries.DeleteAccount(ctx, acc.ID)
+		deleteUser(t, acc.Owner)
 	})
 
 	require.NotEmpty(t, acc)
@@ -34,6 +35,7 @@ func TestGetAccount(t *testing.T) {
 
 	t.Cleanup(func() {
 		_ = testQueries.DeleteAccount(ctx, acc1.ID)
+		deleteUser(t, acc1.Owner)
 	})
 
 	acc2, err := testQueries.GetAccount(ctx, acc1.ID)
@@ -59,6 +61,7 @@ func TestUpdateAccount(t *testing.T) {
 
 	t.Cleanup(func() {
 		_ = testQueries.DeleteAccount(ctx, acc1.ID)
+		deleteUser(t, acc1.Owner)
 	})
 
 	arg2 := UpdateAccountParams{
@@ -75,26 +78,31 @@ func TestUpdateAccount(t *testing.T) {
 func TestDeleteAccount(t *testing.T) {
 	ctx := context.Background()
 	acc, _ := createRandomAccount(t)
+	owner := acc.Owner
 
 	err := testQueries.DeleteAccount(ctx, acc.ID)
 	require.NoError(t, err)
 
 	_, err = testQueries.GetAccount(ctx, acc.ID)
 	require.EqualError(t, err, pgx.ErrNoRows.Error())
+
+	t.Cleanup(func() {
+		deleteUser(t, owner)
+	})
 }
 
 func TestListAccounts(t *testing.T) {
 	ctx := context.Background()
-	var createdIDs []int64
-
+	var createdAccounts []Account
 	for i := 0; i < 10; i++ {
 		acc, _ := createRandomAccount(t)
-		createdIDs = append(createdIDs, acc.ID)
+		createdAccounts = append(createdAccounts, acc)
 	}
 
 	t.Cleanup(func() {
-		for _, id := range createdIDs {
-			_ = testQueries.DeleteAccount(ctx, id)
+		for _, acc := range createdAccounts {
+			_ = testQueries.DeleteAccount(ctx, acc.ID)
+			deleteUser(t, acc.Owner)
 		}
 	})
 
@@ -118,6 +126,7 @@ func TestChangeAccountBalance(t *testing.T) {
 
 	t.Cleanup(func() {
 		_ = testQueries.DeleteAccount(ctx, acc1.ID)
+		deleteUser(t, acc1.Owner)
 	})
 
 	amount := int64(gofakeit.Number(1, 1000))
@@ -138,6 +147,7 @@ func TestGetAccountForUpdate(t *testing.T) {
 
 	t.Cleanup(func() {
 		_ = testQueries.DeleteAccount(ctx, acc1.ID)
+		deleteUser(t, acc1.Owner)
 	})
 
 	acc2, err := testQueries.GetAccountForUpdate(ctx, acc1.ID)
@@ -151,11 +161,15 @@ func TestGetAccountForUpdate(t *testing.T) {
 
 func TestCreateAccountNegativeBalanceConstraint(t *testing.T) {
 	ctx := context.Background()
+	user, _ := createRandomUser(t)
+	t.Cleanup(func() {
+		deleteUser(t, user.Username)
+	})
 
 	arg := CreateAccountParams{
-		Owner:    gofakeit.Name(),
+		Owner:    user.Username,
 		Balance:  -100,
-		Currency: gofakeit.CurrencyShort(),
+		Currency: randomCurrency(),
 	}
 
 	_, err := testQueries.CreateAccount(ctx, arg)
@@ -169,6 +183,7 @@ func TestUpdateAccountNegativeBalanceConstraint(t *testing.T) {
 
 	t.Cleanup(func() {
 		_ = testQueries.DeleteAccount(ctx, acc.ID)
+		deleteUser(t, acc.Owner)
 	})
 
 	arg := UpdateAccountParams{
@@ -183,9 +198,9 @@ func TestUpdateAccountNegativeBalanceConstraint(t *testing.T) {
 
 func TestChangeAccountBalanceNegativeConstraint(t *testing.T) {
 	ctx := context.Background()
-
+	user, _ := createRandomUser(t)
 	arg := CreateAccountParams{
-		Owner:    gofakeit.Name(),
+		Owner:    user.Username,
 		Balance:  100,
 		Currency: "USD",
 	}
@@ -194,6 +209,7 @@ func TestChangeAccountBalanceNegativeConstraint(t *testing.T) {
 
 	t.Cleanup(func() {
 		_ = testQueries.DeleteAccount(ctx, acc.ID)
+		deleteUser(t, user.Username)
 	})
 
 	// attempt to decrease balance by more than current balance

@@ -14,11 +14,30 @@ func randomCurrency() string {
 	return supportedCurrencies[gofakeit.Number(0, len(supportedCurrencies)-1)]
 }
 
+func createRandomUser(t *testing.T) (User, CreateUserParams) {
+	t.Helper()
+	hashedPassword, err := util.HashPassword(gofakeit.Password(true, true, true, true, false, 16))
+	if err != nil {
+		t.Fatal("Cannot hash password:", err)
+	}
+	arg := CreateUserParams{
+		Username:       gofakeit.Username(),
+		HashedPassword: hashedPassword,
+		FullName:       gofakeit.Name(),
+		Email:          gofakeit.Email(),
+	}
+	user, err := testQueries.CreateUser(context.Background(), arg)
+	if err != nil {
+		t.Fatal("Cannot create user:", err)
+	}
+	return user, arg
+}
+
 func createRandomAccount(t *testing.T) (Account, CreateAccountParams) {
 	t.Helper()
-
+	user, _ := createRandomUser(t)
 	arg := CreateAccountParams{
-		Owner:    gofakeit.Name(),
+		Owner:    user.Username,
 		Balance:  int64(gofakeit.Price(0, 10000)),
 		Currency: randomCurrency(),
 	}
@@ -30,6 +49,21 @@ func createRandomAccount(t *testing.T) (Account, CreateAccountParams) {
 	}
 
 	return acc, arg
+}
+
+func deleteUser(t *testing.T, username string) {
+	t.Helper()
+	tag, err := testQueries.db.Exec(
+		context.Background(),
+		"DELETE FROM users WHERE username = $1",
+		username,
+	)
+	if err != nil {
+		t.Fatal("Cannot delete user:", err)
+	}
+	if tag.RowsAffected() != 1 {
+		t.Fatalf("expected to delete 1 row, deleted %d", tag.RowsAffected())
+	}
 }
 
 func deleteEntry(t *testing.T, entry_id int64) {

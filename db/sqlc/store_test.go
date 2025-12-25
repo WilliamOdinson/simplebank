@@ -14,19 +14,23 @@ func TestTransferTx(t *testing.T) {
 	ctx := context.Background()
 	store := NewStore(testPool)
 
+	// create users first
+	user1, _ := createRandomUser(t)
+	user2, _ := createRandomUser(t)
+
 	// create accounts with sufficient balance for transfers
 	acc1Arg := CreateAccountParams{
-		Owner:    gofakeit.Name(),
+		Owner:    user1.Username,
 		Balance:  10000,
-		Currency: gofakeit.CurrencyShort(),
+		Currency: randomCurrency(),
 	}
 	account1, err := testQueries.CreateAccount(ctx, acc1Arg)
 	require.NoError(t, err)
 
 	acc2Arg := CreateAccountParams{
-		Owner:    gofakeit.Name(),
+		Owner:    user2.Username,
 		Balance:  10000,
-		Currency: gofakeit.CurrencyShort(),
+		Currency: randomCurrency(),
 	}
 	account2, err := testQueries.CreateAccount(ctx, acc2Arg)
 	require.NoError(t, err)
@@ -160,6 +164,8 @@ func TestTransferTx(t *testing.T) {
 		}
 		_ = testQueries.DeleteAccount(ctx, account2.ID)
 		_ = testQueries.DeleteAccount(ctx, account1.ID)
+		deleteUser(t, user2.Username)
+		deleteUser(t, user1.Username)
 	})
 }
 
@@ -171,6 +177,7 @@ func TestTransferTxSameAccountConstraint(t *testing.T) {
 
 	t.Cleanup(func() {
 		_ = testQueries.DeleteAccount(ctx, acc.ID)
+		deleteUser(t, acc.Owner)
 	})
 
 	// transfer to the same account should fail
@@ -196,6 +203,8 @@ func TestTransferTxNegativeAmountConstraint(t *testing.T) {
 	t.Cleanup(func() {
 		_ = testQueries.DeleteAccount(ctx, acc2.ID)
 		_ = testQueries.DeleteAccount(ctx, acc1.ID)
+		deleteUser(t, acc2.Owner)
+		deleteUser(t, acc1.Owner)
 	})
 
 	// negative amount should fail
@@ -221,6 +230,8 @@ func TestTransferTxZeroAmountConstraint(t *testing.T) {
 	t.Cleanup(func() {
 		_ = testQueries.DeleteAccount(ctx, acc2.ID)
 		_ = testQueries.DeleteAccount(ctx, acc1.ID)
+		deleteUser(t, acc2.Owner)
+		deleteUser(t, acc1.Owner)
 	})
 
 	// zero amount should fail
@@ -240,11 +251,12 @@ func TestTransferTxInsufficientBalanceConstraint(t *testing.T) {
 	ctx := context.Background()
 	store := NewStore(testPool)
 
-	// create account with small balance
+	// create user and account with small balance
+	user1, _ := createRandomUser(t)
 	acc1Arg := CreateAccountParams{
-		Owner:    gofakeit.Name(),
+		Owner:    user1.Username,
 		Balance:  100,
-		Currency: gofakeit.CurrencyShort(),
+		Currency: randomCurrency(),
 	}
 	acc1, err := testQueries.CreateAccount(ctx, acc1Arg)
 	require.NoError(t, err)
@@ -254,6 +266,8 @@ func TestTransferTxInsufficientBalanceConstraint(t *testing.T) {
 	t.Cleanup(func() {
 		_ = testQueries.DeleteAccount(ctx, acc2.ID)
 		_ = testQueries.DeleteAccount(ctx, acc1.ID)
+		deleteUser(t, acc2.Owner)
+		deleteUser(t, user1.Username)
 	})
 
 	// transfer more than balance should fail due to balance_non_negative constraint
@@ -278,19 +292,23 @@ func TestBilateralTransferTxDeadlock(t *testing.T) {
 	ctx := context.Background()
 	store := NewStore(testPool)
 
+	// create users first
+	user1, _ := createRandomUser(t)
+	user2, _ := createRandomUser(t)
+
 	// create accounts with sufficient balance
 	acc1Arg := CreateAccountParams{
-		Owner:    gofakeit.Name(),
+		Owner:    user1.Username,
 		Balance:  10000,
-		Currency: gofakeit.CurrencyShort(),
+		Currency: randomCurrency(),
 	}
 	account1, err := testQueries.CreateAccount(ctx, acc1Arg)
 	require.NoError(t, err)
 
 	acc2Arg := CreateAccountParams{
-		Owner:    gofakeit.Name(),
+		Owner:    user2.Username,
 		Balance:  10000,
-		Currency: gofakeit.CurrencyShort(),
+		Currency: randomCurrency(),
 	}
 	account2, err := testQueries.CreateAccount(ctx, acc2Arg)
 	require.NoError(t, err)
@@ -343,6 +361,7 @@ func TestBilateralTransferTxDeadlock(t *testing.T) {
 		require.NoError(t, err)
 
 		result := <-results
+
 		// collect IDs for cleanup
 		transferIDs = append(transferIDs, result.Transfer.ID)
 		entryIDs = append(entryIDs, result.FromEntry.ID, result.ToEntry.ID)
@@ -370,5 +389,7 @@ func TestBilateralTransferTxDeadlock(t *testing.T) {
 		}
 		_ = testQueries.DeleteAccount(ctx, account2.ID)
 		_ = testQueries.DeleteAccount(ctx, account1.ID)
+		deleteUser(t, user2.Username)
+		deleteUser(t, user1.Username)
 	})
 }

@@ -33,6 +33,8 @@ func TestCreateTransfer(t *testing.T) {
 		deleteTransfer(t, trs.ID)
 		_ = testQueries.DeleteAccount(ctx, toAcc.ID)
 		_ = testQueries.DeleteAccount(ctx, fromAcc.ID)
+		deleteUser(t, toAcc.Owner)
+		deleteUser(t, fromAcc.Owner)
 	})
 }
 
@@ -52,6 +54,8 @@ func TestGetTransfer(t *testing.T) {
 		deleteTransfer(t, trs1.ID)
 		_ = testQueries.DeleteAccount(ctx, toAcc.ID)
 		_ = testQueries.DeleteAccount(ctx, fromAcc.ID)
+		deleteUser(t, toAcc.Owner)
+		deleteUser(t, fromAcc.Owner)
 	})
 
 	trs2, err := testQueries.GetTransfer(ctx, trs1.ID)
@@ -95,6 +99,8 @@ func TestListTransfers(t *testing.T) {
 		}
 		_ = testQueries.DeleteAccount(ctx, acc2.ID)
 		_ = testQueries.DeleteAccount(ctx, acc1.ID)
+		deleteUser(t, acc2.Owner)
+		deleteUser(t, acc1.Owner)
 	})
 
 	arg := ListTransfersParams{
@@ -123,6 +129,8 @@ func TestCreateTransferZeroAmountConstraint(t *testing.T) {
 	t.Cleanup(func() {
 		_ = testQueries.DeleteAccount(ctx, toAcc.ID)
 		_ = testQueries.DeleteAccount(ctx, fromAcc.ID)
+		deleteUser(t, toAcc.Owner)
+		deleteUser(t, fromAcc.Owner)
 	})
 
 	arg := CreateTransferParams{
@@ -144,6 +152,8 @@ func TestCreateTransferNegativeAmountConstraint(t *testing.T) {
 	t.Cleanup(func() {
 		_ = testQueries.DeleteAccount(ctx, toAcc.ID)
 		_ = testQueries.DeleteAccount(ctx, fromAcc.ID)
+		deleteUser(t, toAcc.Owner)
+		deleteUser(t, fromAcc.Owner)
 	})
 
 	arg := CreateTransferParams{
@@ -163,6 +173,7 @@ func TestCreateTransferSameAccountConstraint(t *testing.T) {
 
 	t.Cleanup(func() {
 		_ = testQueries.DeleteAccount(ctx, acc.ID)
+		deleteUser(t, acc.Owner)
 	})
 
 	arg := CreateTransferParams{
