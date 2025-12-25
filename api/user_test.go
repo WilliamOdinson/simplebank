@@ -263,6 +263,25 @@ func TestCreateUserAPI(t *testing.T) {
 			},
 		},
 		{
+			name: "PasswordTooLong",
+			body: map[string]any{
+				"username":  gofakeit.Username(),
+				"password":  string(make([]byte, 73)),
+				"full_name": gofakeit.Name(),
+				"email":     gofakeit.Email(),
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					CreateUser(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusInternalServerError {
+					t.Errorf("expected status code 500, got %d", recorder.Code)
+				}
+			},
+		},
+		{
 			name: "InvalidUsername",
 			body: map[string]any{
 				"username":  "user@name",
