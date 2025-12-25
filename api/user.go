@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"time"
 
 	db "github.com/WilliamOdinson/simplebank/db/sqlc"
 	"github.com/WilliamOdinson/simplebank/util"
@@ -14,6 +15,14 @@ type createUserRequest struct {
 	Password string `json:"password" binding:"required,min=8"`
 	FullName string `json:"full_name" binding:"required"`
 	Email    string `json:"email" binding:"required,email"`
+}
+
+type createUserResponse struct {
+	Username          string `json:"username"`
+	FullName          string `json:"full_name"`
+	Email             string `json:"email"`
+	PasswordChangedAt string `json:"password_changed_at"`
+	CreatedAt         string `json:"created_at"`
 }
 
 func (server *Server) createUser(ctx *gin.Context) {
@@ -48,5 +57,11 @@ func (server *Server) createUser(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, user)
+	ctx.JSON(http.StatusOK, createUserResponse{
+		Username:          user.Username,
+		FullName:          user.FullName,
+		Email:             user.Email,
+		PasswordChangedAt: user.PasswordChangedAt.Time.Format(time.RFC3339),
+		CreatedAt:         user.CreatedAt.Time.Format(time.RFC3339),
+	})
 }
