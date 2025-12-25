@@ -6,6 +6,7 @@ import (
 
 	db "github.com/WilliamOdinson/simplebank/db/sqlc"
 	"github.com/gin-gonic/gin"
+	"github.com/lib/pq"
 )
 
 // only allow the owner and currency to be set when creating an account
@@ -40,6 +41,13 @@ func (server *Server) createAccount(ctx *gin.Context) {
 	})
 
 	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok {
+			switch pqErr.Code.Name() {
+			case "foreign_key_violation", "unique_violation":
+				ctx.JSON(http.StatusForbidden, errorResponse(err))
+				return
+			}
+		}
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
