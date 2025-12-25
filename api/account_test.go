@@ -326,7 +326,7 @@ func TestCreateAccountAPI(t *testing.T) {
 }
 
 func TestListAccountsAPI(t *testing.T) {
-	owner := gofakeit.Username()
+	owner := gofakeit.LetterN(10)
 	n := 5
 	accounts := make([]db.Account, n)
 	for i := 0; i < n; i++ {
@@ -518,7 +518,7 @@ func TestListAccountsAPI(t *testing.T) {
 }
 
 func TestListAccountsAPI_MissingParams(t *testing.T) {
-	owner := gofakeit.Username()
+	owner := gofakeit.LetterN(10)
 
 	testCases := []struct {
 		name          string

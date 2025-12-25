@@ -21,7 +21,7 @@ func createRandomUser(t *testing.T) (User, CreateUserParams) {
 		t.Fatal("Cannot hash password:", err)
 	}
 	arg := CreateUserParams{
-		Username:       gofakeit.Username(),
+		Username:       gofakeit.LetterN(10),
 		HashedPassword: hashedPassword,
 		FullName:       gofakeit.Name(),
 		Email:          gofakeit.Email(),

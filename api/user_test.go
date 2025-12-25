@@ -332,7 +332,7 @@ func randomUser(t *testing.T) (db.User, string) {
 	}
 
 	user := db.User{
-		Username:       gofakeit.Username(),
+		Username:       gofakeit.LetterN(10),
 		HashedPassword: hashedPassword,
 		FullName:       gofakeit.Name(),
 		Email:          gofakeit.Email(),

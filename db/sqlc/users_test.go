@@ -82,7 +82,7 @@ func TestCreateUserDuplicateEmail(t *testing.T) {
 	require.NoError(t, err)
 
 	arg := CreateUserParams{
-		Username:       gofakeit.Username(),
+		Username:       gofakeit.LetterN(10),
 		HashedPassword: hashedPassword,
 		FullName:       gofakeit.Name(),
 		Email:          user1.Email,
