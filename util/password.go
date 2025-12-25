@@ -1,11 +1,20 @@
 package util
 
-import "golang.org/x/crypto/bcrypt"
+import (
+	"fmt"
+
+	"golang.org/x/crypto/bcrypt"
+)
 
 // HashPassword takes a plain password and returns the bcrypt hash of it
 func HashPassword(password string) (string, error) {
 	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	return string(hashedBytes), err
+
+	if err != nil {
+		return "", fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	return string(hashedBytes), nil
 }
 
 // CheckPassword compares a plain password with its hashed version
