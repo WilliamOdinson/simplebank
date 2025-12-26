@@ -18,6 +18,7 @@ func TestLoadConfig(t *testing.T) {
 
 func TestLoadConfigNotFound(t *testing.T) {
 	viper.Reset()
-	_, err := LoadConfig("/nonexistent/path")
-	require.Error(t, err)
+	require.Panics(t, func() {
+		LoadConfig("/nonexistent/path")
+	})
 }
