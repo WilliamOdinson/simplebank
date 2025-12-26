@@ -36,6 +36,12 @@ func NewServer(config util.Config, store db.Store) (*Server, error) {
 		v.RegisterValidation("currency", validCurrencies)
 	}
 
+	server.setupRouter()
+
+	return server, nil
+}
+
+func (server *Server) setupRouter() {
 	router := gin.Default()
 
 	// Define routes
@@ -48,7 +54,6 @@ func NewServer(config util.Config, store db.Store) (*Server, error) {
 	router.POST("/transfers", server.createTransfer)
 
 	server.router = router
-	return server, nil
 }
 
 func errorResponse(err error) gin.H {
