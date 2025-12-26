@@ -15,7 +15,7 @@ type Config struct {
 	AccessTokenDuration time.Duration `mapstructure:"ACCESS_TOKEN_DURATION"`
 }
 
-// LoadConfig reads configuration from environment variables
+// LoadConfig reads configuration from file or environment variables
 func LoadConfig(path string) (config Config, err error) {
 	viper.AddConfigPath(path)
 	viper.SetConfigName("app")
@@ -23,11 +23,32 @@ func LoadConfig(path string) (config Config, err error) {
 
 	viper.AutomaticEnv()
 
-	err = viper.ReadInConfig()
+	// environment variables
+	viper.BindEnv("DB_SOURCE")
+	viper.BindEnv("SERVER_ADDRESS")
+	viper.BindEnv("TOKEN_SYMMETRIC_KEY")
+	viper.BindEnv("ACCESS_TOKEN_DURATION")
+
+	// Try to read config file (if it exists)
+	viper.ReadInConfig()
+
+	err = viper.Unmarshal(&config)
 	if err != nil {
 		return
 	}
 
-	err = viper.Unmarshal(&config)
+	if config.DBSource == "" {
+		panic("DB_SOURCE is required")
+	}
+	if config.ServerAddress == "" {
+		panic("SERVER_ADDRESS is required")
+	}
+	if config.TokenSymmetricKey == "" {
+		panic("TOKEN_SYMMETRIC_KEY is required")
+	}
+	if config.AccessTokenDuration == 0 {
+		panic("ACCESS_TOKEN_DURATION is required")
+	}
+
 	return
 }
