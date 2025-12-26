@@ -8,31 +8,36 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	mockdb "github.com/WilliamOdinson/simplebank/db/mock"
 	db "github.com/WilliamOdinson/simplebank/db/sqlc"
+	"github.com/WilliamOdinson/simplebank/token"
 	"go.uber.org/mock/gomock"
 )
 
 func TestCreateTransferAPI(t *testing.T) {
 	amount := int64(100)
 
-	// Create some sample accounts
+	user1, _ := randomUser(t)
+	user2, _ := randomUser(t)
+	user3, _ := randomUser(t)
+
 	account1 := db.Account{
 		ID:       1,
-		Owner:    "user1",
+		Owner:    user1.Username,
 		Balance:  1000,
 		Currency: "USD",
 	}
 	account2 := db.Account{
 		ID:       2,
-		Owner:    "user2",
+		Owner:    user2.Username,
 		Balance:  500,
 		Currency: "USD",
 	}
 	account3 := db.Account{
 		ID:       3,
-		Owner:    "user3",
+		Owner:    user3.Username,
 		Balance:  500,
 		Currency: "EUR",
 	}
@@ -40,6 +45,7 @@ func TestCreateTransferAPI(t *testing.T) {
 	testCases := []struct {
 		name          string
 		body          map[string]any
+		setupAuth     func(t *testing.T, request *http.Request, tokenMaker token.Maker)
 		buildStubs    func(store *mockdb.MockStore)
 		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
 	}{
@@ -50,6 +56,9 @@ func TestCreateTransferAPI(t *testing.T) {
 				"to_account_id":   account2.ID,
 				"amount":          amount,
 				"currency":        "USD",
+			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user1.Username, time.Minute)
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().
@@ -76,12 +85,60 @@ func TestCreateTransferAPI(t *testing.T) {
 			},
 		},
 		{
+			name: "NoAuthorization",
+			body: map[string]any{
+				"from_account_id": account1.ID,
+				"to_account_id":   account2.ID,
+				"amount":          amount,
+				"currency":        "USD",
+			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				// Don't add authorization
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					GetAccount(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusUnauthorized {
+					t.Errorf("expected status code 401, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "UnauthorizedUser",
+			body: map[string]any{
+				"from_account_id": account1.ID,
+				"to_account_id":   account2.ID,
+				"amount":          amount,
+				"currency":        "USD",
+			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user2.Username, time.Minute)
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					GetAccount(gomock.Any(), gomock.Eq(account1.ID)).
+					Times(1).
+					Return(account1, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusUnauthorized {
+					t.Errorf("expected status code 401, got %d", recorder.Code)
+				}
+			},
+		},
+		{
 			name: "FromAccountNotFound",
 			body: map[string]any{
 				"from_account_id": account1.ID,
 				"to_account_id":   account2.ID,
 				"amount":          amount,
 				"currency":        "USD",
+			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user1.Username, time.Minute)
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().
@@ -102,6 +159,9 @@ func TestCreateTransferAPI(t *testing.T) {
 				"to_account_id":   account2.ID,
 				"amount":          amount,
 				"currency":        "USD",
+			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user1.Username, time.Minute)
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().
@@ -127,6 +187,9 @@ func TestCreateTransferAPI(t *testing.T) {
 				"amount":          amount,
 				"currency":        "USD",
 			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user1.Username, time.Minute)
+			},
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().
 					GetAccount(gomock.Any(), gomock.Eq(account1.ID)).
@@ -146,6 +209,9 @@ func TestCreateTransferAPI(t *testing.T) {
 				"to_account_id":   account2.ID,
 				"amount":          amount,
 				"currency":        "USD",
+			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user1.Username, time.Minute)
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().
@@ -171,6 +237,9 @@ func TestCreateTransferAPI(t *testing.T) {
 				"amount":          amount,
 				"currency":        "USD",
 			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user3.Username, time.Minute)
+			},
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().
 					GetAccount(gomock.Any(), gomock.Eq(account3.ID)).
@@ -190,6 +259,9 @@ func TestCreateTransferAPI(t *testing.T) {
 				"to_account_id":   account3.ID,
 				"amount":          amount,
 				"currency":        "USD",
+			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user1.Username, time.Minute)
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().
@@ -214,6 +286,9 @@ func TestCreateTransferAPI(t *testing.T) {
 				"to_account_id":   account2.ID,
 				"amount":          amount,
 				"currency":        "USD",
+			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user1.Username, time.Minute)
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().
@@ -243,6 +318,9 @@ func TestCreateTransferAPI(t *testing.T) {
 				"amount":          amount,
 				"currency":        "USD",
 			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user1.Username, time.Minute)
+			},
 			buildStubs: func(store *mockdb.MockStore) {
 				// No calls expected due to binding validation failure
 			},
@@ -259,6 +337,9 @@ func TestCreateTransferAPI(t *testing.T) {
 				"to_account_id":   0,
 				"amount":          amount,
 				"currency":        "USD",
+			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user1.Username, time.Minute)
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				// No calls expected due to binding validation failure
@@ -277,6 +358,9 @@ func TestCreateTransferAPI(t *testing.T) {
 				"amount":          -100,
 				"currency":        "USD",
 			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user1.Username, time.Minute)
+			},
 			buildStubs: func(store *mockdb.MockStore) {
 				// No calls expected due to binding validation failure
 			},
@@ -293,6 +377,9 @@ func TestCreateTransferAPI(t *testing.T) {
 				"to_account_id":   account2.ID,
 				"amount":          0,
 				"currency":        "USD",
+			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user1.Username, time.Minute)
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				// No calls expected due to binding validation failure
@@ -311,6 +398,9 @@ func TestCreateTransferAPI(t *testing.T) {
 				"amount":          amount,
 				"currency":        "INVALID",
 			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user1.Username, time.Minute)
+			},
 			buildStubs: func(store *mockdb.MockStore) {
 				// No calls expected due to binding validation failure
 			},
@@ -328,8 +418,11 @@ func TestCreateTransferAPI(t *testing.T) {
 				"amount":          amount,
 				"currency":        "USD",
 			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user1.Username, time.Minute)
+			},
 			buildStubs: func(store *mockdb.MockStore) {
-				// No calls expected due to nefield validation failure
+				// No calls expected due to binding validation failure
 			},
 			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
 				if recorder.Code != http.StatusBadRequest {
@@ -343,6 +436,9 @@ func TestCreateTransferAPI(t *testing.T) {
 				"to_account_id": account2.ID,
 				"amount":        amount,
 				"currency":      "USD",
+			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user1.Username, time.Minute)
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				// No calls expected due to binding validation failure
@@ -360,6 +456,9 @@ func TestCreateTransferAPI(t *testing.T) {
 				"amount":          amount,
 				"currency":        "USD",
 			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user1.Username, time.Minute)
+			},
 			buildStubs: func(store *mockdb.MockStore) {
 				// No calls expected due to binding validation failure
 			},
@@ -375,6 +474,9 @@ func TestCreateTransferAPI(t *testing.T) {
 				"from_account_id": account1.ID,
 				"to_account_id":   account2.ID,
 				"currency":        "USD",
+			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user1.Username, time.Minute)
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				// No calls expected due to binding validation failure
@@ -392,6 +494,9 @@ func TestCreateTransferAPI(t *testing.T) {
 				"to_account_id":   account2.ID,
 				"amount":          amount,
 			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user1.Username, time.Minute)
+			},
 			buildStubs: func(store *mockdb.MockStore) {
 				// No calls expected due to binding validation failure
 			},
@@ -404,6 +509,9 @@ func TestCreateTransferAPI(t *testing.T) {
 		{
 			name: "InvalidJSON",
 			body: nil,
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user1.Username, time.Minute)
+			},
 			buildStubs: func(store *mockdb.MockStore) {
 				// No calls expected due to JSON parsing failure
 			},
@@ -420,6 +528,9 @@ func TestCreateTransferAPI(t *testing.T) {
 				"to_account_id":   int64(4),
 				"amount":          amount,
 				"currency":        "EUR",
+			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user3.Username, time.Minute)
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				account4 := db.Account{ID: 4, Owner: "user4", Balance: 500, Currency: "EUR"}
@@ -449,6 +560,9 @@ func TestCreateTransferAPI(t *testing.T) {
 				"to_account_id":   int64(6),
 				"amount":          amount,
 				"currency":        "CAD",
+			},
+			setupAuth: func(t *testing.T, request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, "user5", time.Minute)
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				account5 := db.Account{ID: 5, Owner: "user5", Balance: 500, Currency: "CAD"}
@@ -495,6 +609,7 @@ func TestCreateTransferAPI(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, "/transfers", bytes.NewReader(body))
 			request.Header.Set("Content-Type", "application/json")
 
+			tc.setupAuth(t, request, server.tokenMaker)
 			server.router.ServeHTTP(recorder, request)
 			tc.checkResponse(t, recorder)
 		})
