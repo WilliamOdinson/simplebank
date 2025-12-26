@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 
 	db "github.com/WilliamOdinson/simplebank/db/sqlc"
@@ -65,6 +66,14 @@ func (server *Server) getAccount(ctx *gin.Context) {
 	}
 
 	account, err := server.store.GetAccount(ctx, req.ID)
+
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
+
+	if authPayload.Username != account.Owner {
+		err := errors.New("account does not belong to the authenticated user")
+		ctx.JSON(http.StatusUnauthorized, errorResponse(err))
+		return
+	}
 
 	if err == sql.ErrNoRows {
 		ctx.JSON(http.StatusNotFound, errorResponse(err))
