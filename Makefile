@@ -30,7 +30,7 @@ test:
 	go test -v -cover ./... -count=1
 
 coverage:
-	go test -coverprofile=coverage.out ./... -count=1
+	DB_SOURCE="$(DB_SOURCE)" go test -coverprofile=coverage.out ./... -count=1
 	go tool cover -html=coverage.out -o coverage.html
 	rm -f coverage.out
 
