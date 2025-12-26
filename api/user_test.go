@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -338,6 +339,206 @@ func TestCreateUserAPI(t *testing.T) {
 			}
 
 			request := httptest.NewRequest(http.MethodPost, "/users", bytes.NewReader(body))
+			request.Header.Set("Content-Type", "application/json")
+
+			server.router.ServeHTTP(recorder, request)
+			tc.checkResponse(t, recorder)
+		})
+	}
+}
+
+func TestLoginUserAPI(t *testing.T) {
+	user, password := randomUser(t)
+
+	testCases := []struct {
+		name          string
+		body          map[string]any
+		buildStubs    func(store *mockdb.MockStore)
+		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
+	}{
+		{
+			name: "OK",
+			body: map[string]any{
+				"username": user.Username,
+				"password": password,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					GetUser(gomock.Any(), gomock.Eq(user.Username)).
+					Times(1).
+					Return(user, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusOK {
+					t.Errorf("expected status code 200, got %d", recorder.Code)
+				}
+				var resp loginUserResponse
+				if err := json.NewDecoder(recorder.Body).Decode(&resp); err != nil {
+					t.Fatalf("failed to decode response body: %v", err)
+				}
+				if resp.AccessToken == "" {
+					t.Error("expected access token to be non-empty")
+				}
+				if resp.User.Username != user.Username {
+					t.Errorf("expected username %s, got %s", user.Username, resp.User.Username)
+				}
+			},
+		},
+		{
+			name: "UserNotFound",
+			body: map[string]any{
+				"username": gofakeit.LetterN(10),
+				"password": password,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					GetUser(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(db.User{}, sql.ErrNoRows)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusNotFound {
+					t.Errorf("expected status code 404, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "IncorrectPassword",
+			body: map[string]any{
+				"username": user.Username,
+				"password": gofakeit.LetterN(10),
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					GetUser(gomock.Any(), gomock.Eq(user.Username)).
+					Times(1).
+					Return(user, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusUnauthorized {
+					t.Errorf("expected status code 401, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "InternalError",
+			body: map[string]any{
+				"username": user.Username,
+				"password": password,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					GetUser(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(db.User{}, fmt.Errorf("internal error"))
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusInternalServerError {
+					t.Errorf("expected status code 500, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "InvalidJSON",
+			body: nil,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					GetUser(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "MissingUsername",
+			body: map[string]any{
+				"password": password,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					GetUser(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "MissingPassword",
+			body: map[string]any{
+				"username": user.Username,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					GetUser(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "PasswordTooShort",
+			body: map[string]any{
+				"username": user.Username,
+				"password": gofakeit.LetterN(5),
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					GetUser(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
+		{
+			name: "InvalidUsername",
+			body: map[string]any{
+				"username": gofakeit.LetterN(10) + "!@#$%^&*()",
+				"password": password,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					GetUser(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				if recorder.Code != http.StatusBadRequest {
+					t.Errorf("expected status code 400, got %d", recorder.Code)
+				}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			store := mockdb.NewMockStore(ctrl)
+			tc.buildStubs(store)
+
+			server := newTestServer(t, store)
+			recorder := httptest.NewRecorder()
+
+			var body []byte
+			if tc.body != nil {
+				body, _ = json.Marshal(tc.body)
+			} else {
+				body = []byte("invalid json")
+			}
+
+			request := httptest.NewRequest(http.MethodPost, "/users/login", bytes.NewReader(body))
 			request.Header.Set("Content-Type", "application/json")
 
 			server.router.ServeHTTP(recorder, request)
