@@ -77,7 +77,7 @@ func TestCreateUserAPI(t *testing.T) {
 				if recorder.Code != http.StatusOK {
 					t.Errorf("expected status code 200, got %d", recorder.Code)
 				}
-				var resp createUserResponse
+				var resp userResponse
 				if err := json.NewDecoder(recorder.Body).Decode(&resp); err != nil {
 					t.Fatalf("failed to decode response body: %v", err)
 				}
