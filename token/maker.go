@@ -1,7 +1,16 @@
 package token
 
 import (
+	"errors"
 	"time"
+)
+
+var (
+	// ErrExpiredToken is returned when the token has expired
+	ErrExpiredToken = errors.New("token has expired")
+
+	// ErrInvalidToken is returned when the token is invalid
+	ErrInvalidToken = errors.New("token is invalid")
 )
 
 // Maker is an interface for managing tokens
