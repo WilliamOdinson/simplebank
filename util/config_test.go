@@ -12,6 +12,8 @@ func TestLoadConfig(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, config.DBSource)
 	require.NotEmpty(t, config.ServerAddress)
+	require.NotEmpty(t, config.TokenSymmetricKey)
+	require.NotZero(t, config.AccessTokenDuration)
 }
 
 func TestLoadConfigNotFound(t *testing.T) {

@@ -118,7 +118,7 @@ func TestGetAccountAPI(t *testing.T) {
 			tc.buildStubs(store)
 
 			// 3. Create server and recorder
-			server := NewServer(store)
+			server := newTestServer(t, store)
 			recorder := httptest.NewRecorder()
 
 			// 4. Create request
@@ -342,7 +342,7 @@ func TestCreateAccountAPI(t *testing.T) {
 			tc.buildStubs(store)
 
 			// 3. Create server and recorder
-			server := NewServer(store)
+			server := newTestServer(t, store)
 			recorder := httptest.NewRecorder()
 
 			// 4. Create request body
@@ -540,7 +540,7 @@ func TestListAccountsAPI(t *testing.T) {
 			tc.buildStubs(store)
 
 			// 3. Create server and recorder
-			server := NewServer(store)
+			server := newTestServer(t, store)
 			recorder := httptest.NewRecorder()
 
 			// 4. Create request
@@ -613,7 +613,7 @@ func TestListAccountsAPI_MissingParams(t *testing.T) {
 				Times(0)
 
 			// 3. Create server and recorder
-			server := NewServer(store)
+			server := newTestServer(t, store)
 			recorder := httptest.NewRecorder()
 
 			// 4. Create request
@@ -631,7 +631,7 @@ func TestServerStart(t *testing.T) {
 	defer ctrl.Finish()
 
 	store := mockdb.NewMockStore(ctrl)
-	server := NewServer(store)
+	server := newTestServer(t, store)
 
 	// Test that Start returns an error for invalid address
 	err := server.Start("invalid-address-that-will-fail")
