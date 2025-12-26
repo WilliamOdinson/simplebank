@@ -1,6 +1,7 @@
 FROM golang:1.25-alpine AS builder
 WORKDIR /app
 
+RUN apk add --no-cache git
 RUN go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 
 COPY go.mod go.sum ./
