@@ -9,7 +9,7 @@ RUN go mod download
 
 COPY . .
 RUN sqlc generate
-RUN go mod tidy
+
 RUN CGO_ENABLED=0 GOOS=linux go build -o main main.go
 
 FROM alpine:latest
