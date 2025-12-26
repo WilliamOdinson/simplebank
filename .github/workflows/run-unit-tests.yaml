@@ -3,8 +3,24 @@ name: SimpleBank Unit Tests
 on:
   push:
     branches: [main]
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
+      - "db/migrations/**"
+      - "db/queries/**"
+      - "sqlc.yaml"
+      - ".github/workflows/run-unit-tests.yaml"
   pull_request:
     branches: [main]
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
+      - "db/migrations/**"
+      - "db/queries/**"
+      - "sqlc.yaml"
+      - ".github/workflows/run-unit-tests.yaml"
 
 permissions:
   contents: read
