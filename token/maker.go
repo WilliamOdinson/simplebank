@@ -11,6 +11,9 @@ var (
 
 	// ErrInvalidToken is returned when the token is invalid
 	ErrInvalidToken = errors.New("token is invalid")
+
+	// ErrInvalidKeySize is returned when the key size is invalid
+	ErrInvalidKeySize = errors.New("invalid key size")
 )
 
 // Maker is an interface for managing tokens
